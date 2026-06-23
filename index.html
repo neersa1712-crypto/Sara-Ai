@@ -1,155 +1,235 @@
 <!DOCTYPE html>
 <html lang="en">
 <head>
-    <meta charset="UTF-8">
-    <meta name="viewport" content="width=device-width, initial-scale=1.0">
-    <title>Sara - Diagnostic Mode</title>
-    <style>
-        body {
-            margin: 0; background-color: #050505; color: #ffffff;
-            font-family: sans-serif; display: flex; flex-direction: column;
-            align-items: center; justify-content: center; height: 100vh; overflow: hidden;
-        }
-        #ai-orb {
-            width: 110px; height: 110px; border-radius: 50%;
-            background: #222; box-shadow: 0 0 20px #111; transition: all 0.5s ease;
-            margin-bottom: 30px;
-        }
-        .sleeping { background: #333; box-shadow: 0 0 10px #222; }
-        .listening { background: #3b82f6; box-shadow: 0 0 50px #3b82f6; animation: pulse 1.5s infinite alternate; }
-        .thinking { background: #d946ef; box-shadow: 0 0 50px #d946ef; animation: pulse 0.5s infinite alternate; }
-        .speaking { background: #10b981; box-shadow: 0 0 60px #10b981; animation: pulse 0.8s infinite alternate; }
-        @keyframes pulse { 0% { transform: scale(1); } 100% { transform: scale(1.1); } }
-        
-        #status { color: #888; font-size: 1.2rem; margin-bottom: 10px; text-align: center; }
-        
-        /* Debug Box: Ye aapko batayega ki phone aakhir kya sun raha hai */
-        #debug-box { color: #facc15; font-size: 1rem; margin-bottom: 15px; text-align: center; background: #333; padding: 5px 15px; border-radius: 10px; }
-        
-        #response { color: #e2e8f0; font-size: 1.1rem; max-width: 80%; text-align: center; min-height: 50px; }
-        #top-bar { position: absolute; top: 0; left: 0; width: 100%; padding: 15px 20px; display: flex; justify-content: space-between; box-sizing: border-box; }
-        .nav-btn { background: rgba(255,255,255,0.2); color: white; border: none; padding: 8px 15px; border-radius: 20px; font-weight: bold; }
-    </style>
+<meta charset="UTF-8">
+<meta name="viewport" content="width=device-width, initial-scale=1.0">
+<title>AI Friend</title>
+
+<style>
+*{
+    margin:0;
+    padding:0;
+    box-sizing:border-box;
+    font-family:Arial,sans-serif;
+}
+
+body{
+    background:#111;
+    color:white;
+    display:flex;
+    flex-direction:column;
+    height:100vh;
+}
+
+header{
+    text-align:center;
+    padding:15px;
+    font-size:24px;
+    font-weight:bold;
+    border-bottom:1px solid #333;
+}
+
+#chat{
+    flex:1;
+    overflow-y:auto;
+    padding:15px;
+}
+
+.message{
+    max-width:80%;
+    padding:12px;
+    margin:10px 0;
+    border-radius:12px;
+    line-height:1.5;
+}
+
+.user{
+    background:#2563eb;
+    margin-left:auto;
+}
+
+.ai{
+    background:#222;
+}
+
+#status{
+    text-align:center;
+    padding:10px;
+    color:#00ff88;
+}
+
+.controls{
+    padding:20px;
+    display:flex;
+    justify-content:center;
+}
+
+button{
+    border:none;
+    background:#00ff88;
+    color:black;
+    font-size:18px;
+    font-weight:bold;
+    padding:15px 25px;
+    border-radius:50px;
+    cursor:pointer;
+}
+</style>
 </head>
 <body>
 
-    <div id="top-bar">
-        <button class="nav-btn" onclick="window.history.back()">❮ Back</button>
-    </div>
-    
-    <div id="ai-orb" class="sleeping"></div>
-    <div id="status">Tap screen to Start...</div>
-    <div id="debug-box">Mic Test: Not started yet</div>
-    <div id="response"></div>
+<header>
+    AI Friend
+</header>
 
-    <script>
-        // --- 1. APNI API KEY YAHAN DALEIN ---
-        const GEMINI_API_KEY = "AQ.Ab8RN6LntV3xOqxMBWf1vta2983okEuL_6zPCSjMeYaiWtfDIg"; 
+<div id="chat"></div>
 
-        const statusText = document.getElementById('status');
-        const debugBox = document.getElementById('debug-box');
-        const responseText = document.getElementById('response');
-        const orb = document.getElementById('ai-orb');
-        
-        let isAwake = false; let isSpeaking = false; let recognition; let ttsUnlocked = false;
+<div id="status">
+    Ready
+</div>
 
-        document.body.addEventListener('click', function() {
-            if(!ttsUnlocked) {
-                let unlockAudio = new SpeechSynthesisUtterance(" "); // Space character to safely unlock audio
-                window.speechSynthesis.speak(unlockAudio);
-                ttsUnlocked = true;
-                debugBox.innerText = "System Ready! Say 'Hello'";
-            }
-            if (!recognition) initVoiceSystem();
-        });
+<div class="controls">
+    <button id="listenBtn">
+        🎤 Talk
+    </button>
+</div>
 
-        function setOrbState(state) { orb.className = ''; orb.classList.add(state); }
+<script>
+const chat = document.getElementById("chat");
+const statusBox = document.getElementById("status");
+const button = document.getElementById("listenBtn");
 
-        function initVoiceSystem() {
-            const SpeechRecognition = window.SpeechRecognition || window.webkitSpeechRecognition;
-            recognition = new SpeechRecognition();
-            recognition.continuous = false; 
-            recognition.lang = 'hi-IN';
+let memory = JSON.parse(
+    localStorage.getItem("ai_memory") || "[]"
+);
 
-            recognition.onstart = () => {
-                if(!isAwake) { statusText.innerText = "Sleeping... Say 'Hello'"; setOrbState('sleeping'); } 
-                else if(!isSpeaking) { statusText.innerText = "Listening..."; setOrbState('listening'); }
-            };
+function addMessage(text,type){
+    const div=document.createElement("div");
+    div.className=`message ${type}`;
+    div.textContent=text;
+    chat.appendChild(div);
+    chat.scrollTop=chat.scrollHeight;
+}
 
-            recognition.onresult = async function(event) {
-                const transcript = event.results[0][0].transcript.toLowerCase().trim();
-                
-                // DEBUG: Screen par show karega ki mic ne kya suna
-                debugBox.innerText = "Mic Heard: " + transcript; 
-                
-                if (!isAwake) {
-                    if (transcript.includes("sara") || transcript.includes("सारा") || transcript.includes("hello") || transcript.includes("wake up")) {
-                        isAwake = true;
-                        speak("Haan ji bataiye?"); 
-                    }
-                } else {
-                    if (transcript.includes("bye") || transcript.includes("stop") || transcript.includes("so jao")) {
-                        isAwake = false;
-                        speak("Theek hai. Main jaa rahi hu.");
-                        return;
-                    }
-                    statusText.innerText = "Thinking..."; setOrbState('thinking');
-                    speak("Hmm...", true); 
-                    await callGeminiAI(transcript);
-                }
-            };
+function saveMemory(role,text){
+    memory.push({
+        role,
+        text,
+        time:new Date().toISOString()
+    });
 
-            recognition.onerror = (e) => { debugBox.innerText = "Error: " + e.error; };
-            recognition.onend = () => { if(!isSpeaking) { try { recognition.start(); } catch(e) {} } };
+    if(memory.length>50){
+        memory.shift();
+    }
 
-            try { recognition.start(); } catch(e) {}
-        }
+    localStorage.setItem(
+        "ai_memory",
+        JSON.stringify(memory)
+    );
+}
 
-        async function callGeminiAI(prompt) {
-            try {
-                if(GEMINI_API_KEY === "YOUR_GEMINI_API_KEY_HERE") {
-                    debugBox.innerText = "ERROR: API KEY NAHI DALI HAI!";
-                    speak("Aapne API key nahi daali hai.", false);
-                    return;
-                }
+function speak(text){
 
-                const res = await fetch(`https://generativelanguage.googleapis.com/v1beta/models/gemini-1.5-flash:generateContent?key=${GEMINI_API_KEY}`, {
-                    method: 'POST', headers: { 'Content-Type': 'application/json' },
-                    body: JSON.stringify({ contents: [{ parts: [{ text: prompt + " (Reply shortly in Hindi/Hinglish)" }] }] })
-                });
-                const data = await res.json();
-                
-                if(data.error) {
-                    debugBox.innerText = "API ERROR: " + data.error.message;
-                    speak("API mein problem hai.", false);
-                    return;
-                }
+    speechSynthesis.cancel();
 
-                const textReply = data.candidates[0].content.parts[0].text;
-                responseText.innerText = textReply;
-                speak(textReply, false);
-            } catch (e) {
-                debugBox.innerText = "Network ya API Fetch Error!";
-                if(!isSpeaking) { try{ recognition.start(); }catch(e){} }
-            }
-        }
+    const utterance =
+        new SpeechSynthesisUtterance(text);
 
-        function speak(text, isFiller = false) {
-            isSpeaking = true;
-            if(recognition) recognition.stop(); 
-            const utterance = new SpeechSynthesisUtterance(text);
-            utterance.lang = 'hi-IN';
+    utterance.lang="en-US";
+    utterance.rate=1;
+    utterance.pitch=1;
 
-            utterance.onstart = () => { if(!isFiller) { statusText.innerText = "Speaking..."; setOrbState('speaking'); } };
-            utterance.onend = () => {
-                if(isFiller) return; 
-                isSpeaking = false;
-                if(isAwake) { statusText.innerText = "Listening..."; setOrbState('listening'); } 
-                else { statusText.innerText = "Sleeping... Say 'Hello'"; setOrbState('sleeping'); responseText.innerText = ""; }
-                if(recognition) { try { recognition.start(); } catch(e) {} }
-            };
-            window.speechSynthesis.speak(utterance);
-        }
-    </script>
+    speechSynthesis.speak(utterance);
+}
+
+function generateReply(userText){
+
+    const text=userText.toLowerCase();
+
+    if(text.includes("hello") || text.includes("hi")){
+        return "Hello my friend. How are you today?";
+    }
+
+    if(text.includes("name")){
+        return "I am your AI friend.";
+    }
+
+    if(text.includes("time")){
+        return "Current time is " +
+            new Date().toLocaleTimeString();
+    }
+
+    if(text.includes("date")){
+        return "Today's date is " +
+            new Date().toLocaleDateString();
+    }
+
+    if(text.includes("how are you")){
+        return "I am doing great. Thank you for asking.";
+    }
+
+    return "You said: " + userText;
+}
+
+const SpeechRecognition =
+window.SpeechRecognition ||
+window.webkitSpeechRecognition;
+
+if(!SpeechRecognition){
+    alert(
+        "Speech Recognition not supported in this browser."
+    );
+}
+
+const recognition =
+new SpeechRecognition();
+
+recognition.lang="en-US";
+recognition.interimResults=false;
+recognition.continuous=false;
+
+recognition.onstart=()=>{
+    statusBox.textContent="Listening...";
+};
+
+recognition.onend=()=>{
+    statusBox.textContent="Ready";
+};
+
+recognition.onerror=(e)=>{
+    statusBox.textContent=
+        "Error: " + e.error;
+};
+
+recognition.onresult=(event)=>{
+
+    const userText =
+        event.results[0][0].transcript;
+
+    addMessage(userText,"user");
+    saveMemory("user",userText);
+
+    const reply =
+        generateReply(userText);
+
+    addMessage(reply,"ai");
+    saveMemory("ai",reply);
+
+    speak(reply);
+};
+
+button.addEventListener(
+    "click",
+    ()=>{
+        recognition.start();
+    }
+);
+
+addMessage(
+    "Hello! Tap the microphone and talk to me.",
+    "ai"
+);
+</script>
+
 </body>
 </html>
