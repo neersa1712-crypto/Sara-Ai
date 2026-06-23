@@ -3,82 +3,43 @@
 <head>
     <meta charset="UTF-8">
     <meta name="viewport" content="width=device-width, initial-scale=1.0">
-    <title>Sara - Real Voice Assistant</title>
+    <title>Sara - Diagnostic Mode</title>
     <style>
         body {
-            margin: 0;
-            background-color: #050505; /* Battery saving pure black */
-            color: #ffffff;
-            font-family: 'Segoe UI', Tahoma, Geneva, Verdana, sans-serif;
-            display: flex;
-            flex-direction: column;
-            align-items: center;
-            justify-content: center;
-            height: 100vh;
-            overflow: hidden;
-            transition: background-color 0.5s ease;
+            margin: 0; background-color: #050505; color: #ffffff;
+            font-family: sans-serif; display: flex; flex-direction: column;
+            align-items: center; justify-content: center; height: 100vh; overflow: hidden;
         }
-
-        /* Abstract UI: Glowing Orb */
         #ai-orb {
-            width: 110px;
-            height: 110px;
-            border-radius: 50%;
-            background: #222;
-            box-shadow: 0 0 20px #111;
-            transition: all 0.5s ease;
+            width: 110px; height: 110px; border-radius: 50%;
+            background: #222; box-shadow: 0 0 20px #111; transition: all 0.5s ease;
             margin-bottom: 30px;
         }
-
-        .sleeping { background: #333; box-shadow: 0 0 10px #222; opacity: 0.5; }
+        .sleeping { background: #333; box-shadow: 0 0 10px #222; }
         .listening { background: #3b82f6; box-shadow: 0 0 50px #3b82f6; animation: pulse 1.5s infinite alternate; }
         .thinking { background: #d946ef; box-shadow: 0 0 50px #d946ef; animation: pulse 0.5s infinite alternate; }
         .speaking { background: #10b981; box-shadow: 0 0 60px #10b981; animation: pulse 0.8s infinite alternate; }
-
-        @keyframes pulse {
-            0% { transform: scale(1); opacity: 0.8; }
-            100% { transform: scale(1.1); opacity: 1; }
-        }
-
-        #status { color: #888; font-size: 1.2rem; margin-bottom: 10px; text-align: center;}
-        #response { color: #e2e8f0; font-size: 1.1rem; max-width: 80%; text-align: center; min-height: 50px; line-height: 1.6; }
-
-        /* Top Navigation Bar */
-        #top-bar {
-            position: absolute;
-            top: 0;
-            left: 0;
-            width: 100%;
-            padding: 15px 20px;
-            display: flex;
-            justify-content: space-between;
-            box-sizing: border-box;
-            z-index: 100;
-        }
-
-        .nav-btn {
-            background: rgba(255,255,255,0.1);
-            color: white;
-            border: none;
-            padding: 10px 18px;
-            border-radius: 30px;
-            font-size: 0.95rem;
-            cursor: pointer;
-            backdrop-filter: blur(5px);
-            font-weight: bold;
-        }
-        .nav-btn:active { background: rgba(255,255,255,0.3); }
+        @keyframes pulse { 0% { transform: scale(1); } 100% { transform: scale(1.1); } }
+        
+        #status { color: #888; font-size: 1.2rem; margin-bottom: 10px; text-align: center; }
+        
+        /* Debug Box: Ye aapko batayega ki phone aakhir kya sun raha hai */
+        #debug-box { color: #facc15; font-size: 1rem; margin-bottom: 15px; text-align: center; background: #333; padding: 5px 15px; border-radius: 10px; }
+        
+        #response { color: #e2e8f0; font-size: 1.1rem; max-width: 80%; text-align: center; min-height: 50px; }
+        #top-bar { position: absolute; top: 0; left: 0; width: 100%; padding: 15px 20px; display: flex; justify-content: space-between; box-sizing: border-box; }
+        .nav-btn { background: rgba(255,255,255,0.2); color: white; border: none; padding: 8px 15px; border-radius: 20px; font-weight: bold; }
     </style>
 </head>
 <body>
 
     <div id="top-bar">
-        <button class="nav-btn" onclick="goBack()">❮ Back</button>
-        <button class="nav-btn" onclick="exitApp()">✕ Close</button>
+        <button class="nav-btn" onclick="window.history.back()">❮ Back</button>
     </div>
     
     <div id="ai-orb" class="sleeping"></div>
-    <div id="status">Tap screen to Start & Unlock Audio...</div>
+    <div id="status">Tap screen to Start...</div>
+    <div id="debug-box">Mic Test: Not started yet</div>
     <div id="response"></div>
 
     <script>
@@ -86,172 +47,107 @@
         const GEMINI_API_KEY = "AQ.Ab8RN6LntV3xOqxMBWf1vta2983okEuL_6zPCSjMeYaiWtfDIg"; 
 
         const statusText = document.getElementById('status');
+        const debugBox = document.getElementById('debug-box');
         const responseText = document.getElementById('response');
         const orb = document.getElementById('ai-orb');
         
-        let isAwake = false;
-        let isSpeaking = false;
-        let recognition;
-        let bestFemaleVoice = null;
-        let ttsUnlocked = false; // Audio lock bypass ke liye flag
+        let isAwake = false; let isSpeaking = false; let recognition; let ttsUnlocked = false;
 
-        // Browser ki aawaz load karna (Best Female Hindi Voice)
-        function loadBestVoice() {
-            let voices = window.speechSynthesis.getVoices();
-            bestFemaleVoice = voices.find(v => v.lang === 'hi-IN' && v.name.includes('female')) || 
-                              voices.find(v => v.name.includes('Google हिन्दी')) ||
-                              voices.find(v => v.lang === 'hi-IN') || voices[0];
-        }
-        window.speechSynthesis.onvoiceschanged = loadBestVoice;
-
-        async function keepScreenOn() {
-            try { if ('wakeLock' in navigator) await navigator.wakeLock.request('screen'); } 
-            catch (err) { console.log(err); }
-        }
-
-        function setOrbState(state) {
-            orb.className = '';
-            orb.classList.add(state);
-        }
-
-        function goBack() { window.history.back(); }
-        function exitApp() {
-            if (document.fullscreenElement) document.exitFullscreen();
-            else window.history.back();
-        }
-
-        // --- THE MAGIC CLICK: Screen Touch Setup ---
         document.body.addEventListener('click', function() {
-            // Fullscreen karna
-            if (!document.fullscreenElement) document.documentElement.requestFullscreen().catch(e=>e);
-            
-            // Screen on rakhna
-            keepScreenOn();
-            if(!bestFemaleVoice) loadBestVoice();
-            
-            // Audio Lock kholna (Khali aawaz chala kar)
             if(!ttsUnlocked) {
-                let unlockAudio = new SpeechSynthesisUtterance("");
+                let unlockAudio = new SpeechSynthesisUtterance(" "); // Space character to safely unlock audio
                 window.speechSynthesis.speak(unlockAudio);
                 ttsUnlocked = true;
+                debugBox.innerText = "System Ready! Say 'Hello'";
             }
-
-            // Mic chalu karna
             if (!recognition) initVoiceSystem();
         });
 
+        function setOrbState(state) { orb.className = ''; orb.classList.add(state); }
+
         function initVoiceSystem() {
             const SpeechRecognition = window.SpeechRecognition || window.webkitSpeechRecognition;
-            if(!SpeechRecognition) return statusText.innerText = "Please use Chrome Browser.";
-            
             recognition = new SpeechRecognition();
             recognition.continuous = false; 
-            recognition.lang = 'hi-IN'; // Hindi + English
+            recognition.lang = 'hi-IN';
 
             recognition.onstart = () => {
-                if(!isAwake) { 
-                    statusText.innerText = "Sleeping... Say 'Sara' ya 'Hello'"; 
-                    setOrbState('sleeping'); 
-                } 
-                else if(!isSpeaking) { 
-                    statusText.innerText = "Listening..."; 
-                    setOrbState('listening'); 
-                }
+                if(!isAwake) { statusText.innerText = "Sleeping... Say 'Hello'"; setOrbState('sleeping'); } 
+                else if(!isSpeaking) { statusText.innerText = "Listening..."; setOrbState('listening'); }
             };
 
             recognition.onresult = async function(event) {
                 const transcript = event.results[0][0].transcript.toLowerCase().trim();
-                console.log("Mic Heard:", transcript); // Check ke liye console log
+                
+                // DEBUG: Screen par show karega ki mic ne kya suna
+                debugBox.innerText = "Mic Heard: " + transcript; 
                 
                 if (!isAwake) {
-                    // Check Hindi 'सारा', English 'sara' and 'hello'
-                    if (transcript.includes("sara") || transcript.includes("सारा") || transcript.includes("wake up") || transcript.includes("hello")) {
+                    if (transcript.includes("sara") || transcript.includes("सारा") || transcript.includes("hello") || transcript.includes("wake up")) {
                         isAwake = true;
-                        speak("Hmm... Haan ji bataiye?"); 
+                        speak("Haan ji bataiye?"); 
                     }
                 } else {
-                    if (transcript.includes("bye") || transcript.includes("stop") || transcript.includes("so jao") || transcript.includes("बाय")) {
+                    if (transcript.includes("bye") || transcript.includes("stop") || transcript.includes("so jao")) {
                         isAwake = false;
-                        window.speechSynthesis.cancel();
                         speak("Theek hai. Main jaa rahi hu.");
                         return;
                     }
-                    
-                    statusText.innerText = "Thinking...";
-                    setOrbState('thinking');
-                    
-                    // Artificial human thinking sound
+                    statusText.innerText = "Thinking..."; setOrbState('thinking');
                     speak("Hmm...", true); 
                     await callGeminiAI(transcript);
                 }
             };
 
-            recognition.onerror = (e) => { 
-                if(e.error === 'not-allowed') statusText.innerText = "Mic Permission Denied! Allow it from site settings.";
-            };
-            
-            recognition.onend = () => { 
-                // Sirf tab dubara chalu karo jab AI bol na rahi ho
-                if(!isSpeaking) { try { recognition.start(); } catch(e) {} }
-            };
+            recognition.onerror = (e) => { debugBox.innerText = "Error: " + e.error; };
+            recognition.onend = () => { if(!isSpeaking) { try { recognition.start(); } catch(e) {} } };
 
             try { recognition.start(); } catch(e) {}
         }
 
         async function callGeminiAI(prompt) {
             try {
-                // Secret Prompt to make AI sound like a real girl
-                const humanPrompt = prompt + " (Instruction: Reply like a casual human girl. Use filler words like 'Acha', 'Dekho'. Add pauses using commas. Keep it strictly under 2 short sentences in Hinglish. No emojis.)";
+                if(GEMINI_API_KEY === "YOUR_GEMINI_API_KEY_HERE") {
+                    debugBox.innerText = "ERROR: API KEY NAHI DALI HAI!";
+                    speak("Aapne API key nahi daali hai.", false);
+                    return;
+                }
 
                 const res = await fetch(`https://generativelanguage.googleapis.com/v1beta/models/gemini-1.5-flash:generateContent?key=${GEMINI_API_KEY}`, {
-                    method: 'POST',
-                    headers: { 'Content-Type': 'application/json' },
-                    body: JSON.stringify({ contents: [{ parts: [{ text: humanPrompt }] }] })
+                    method: 'POST', headers: { 'Content-Type': 'application/json' },
+                    body: JSON.stringify({ contents: [{ parts: [{ text: prompt + " (Reply shortly in Hindi/Hinglish)" }] }] })
                 });
                 const data = await res.json();
-                const textReply = data.candidates[0].content.parts[0].text;
                 
+                if(data.error) {
+                    debugBox.innerText = "API ERROR: " + data.error.message;
+                    speak("API mein problem hai.", false);
+                    return;
+                }
+
+                const textReply = data.candidates[0].content.parts[0].text;
                 responseText.innerText = textReply;
                 speak(textReply, false);
             } catch (e) {
-                statusText.innerText = "Network Error...";
+                debugBox.innerText = "Network ya API Fetch Error!";
                 if(!isSpeaking) { try{ recognition.start(); }catch(e){} }
             }
         }
 
         function speak(text, isFiller = false) {
             isSpeaking = true;
-            if(recognition) recognition.stop(); // Stop listening while AI is talking
-
+            if(recognition) recognition.stop(); 
             const utterance = new SpeechSynthesisUtterance(text);
             utterance.lang = 'hi-IN';
-            utterance.pitch = 1.2; // Slightly high pitch for soft voice
-            utterance.rate = 0.95; // Slightly slower for natural pacing
-            if(bestFemaleVoice) utterance.voice = bestFemaleVoice;
 
-            utterance.onstart = () => {
-                if(!isFiller) {
-                    statusText.innerText = "Sara is speaking...";
-                    setOrbState('speaking');
-                }
-            };
-
+            utterance.onstart = () => { if(!isFiller) { statusText.innerText = "Speaking..."; setOrbState('speaking'); } };
             utterance.onend = () => {
-                if(isFiller) return; // If it was just "Hmm", do not restart mic yet
-
+                if(isFiller) return; 
                 isSpeaking = false;
-                if(isAwake) {
-                    statusText.innerText = "Listening...";
-                    setOrbState('listening');
-                } else {
-                    statusText.innerText = "Sleeping... Say 'Sara'";
-                    setOrbState('sleeping');
-                    responseText.innerText = "";
-                }
-                
+                if(isAwake) { statusText.innerText = "Listening..."; setOrbState('listening'); } 
+                else { statusText.innerText = "Sleeping... Say 'Hello'"; setOrbState('sleeping'); responseText.innerText = ""; }
                 if(recognition) { try { recognition.start(); } catch(e) {} }
             };
-
             window.speechSynthesis.speak(utterance);
         }
     </script>
