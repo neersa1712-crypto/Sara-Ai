@@ -7,7 +7,7 @@
     <style>
         body {
             margin: 0;
-            background-color: #050505;
+            background-color: #050505; /* Battery saving pure black */
             color: #ffffff;
             font-family: 'Segoe UI', Tahoma, Geneva, Verdana, sans-serif;
             display: flex;
@@ -40,10 +40,10 @@
             100% { transform: scale(1.1); opacity: 1; }
         }
 
-        #status { color: #888; font-size: 1.2rem; margin-bottom: 10px; }
+        #status { color: #888; font-size: 1.2rem; margin-bottom: 10px; text-align: center;}
         #response { color: #e2e8f0; font-size: 1.1rem; max-width: 80%; text-align: center; min-height: 50px; line-height: 1.6; }
 
-        /* Top Navigation Bar with BACK Button */
+        /* Top Navigation Bar */
         #top-bar {
             position: absolute;
             top: 0;
@@ -73,14 +73,12 @@
 <body>
 
     <div id="top-bar">
-        <!-- Naya Back Button -->
         <button class="nav-btn" onclick="goBack()">❮ Back</button>
-        <!-- Exit Button -->
         <button class="nav-btn" onclick="exitApp()">✕ Close</button>
     </div>
     
     <div id="ai-orb" class="sleeping"></div>
-    <div id="status">Tap screen to wake up system...</div>
+    <div id="status">Tap screen to Start & Unlock Audio...</div>
     <div id="response"></div>
 
     <script>
@@ -95,15 +93,14 @@
         let isSpeaking = false;
         let recognition;
         let bestFemaleVoice = null;
+        let ttsUnlocked = false; // Audio lock bypass ke liye flag
 
-        // Load Best Female Voice (Browser Setup)
+        // Browser ki aawaz load karna (Best Female Hindi Voice)
         function loadBestVoice() {
             let voices = window.speechSynthesis.getVoices();
-            // Google ki aawaz sabase natural hoti hai mobile par
             bestFemaleVoice = voices.find(v => v.lang === 'hi-IN' && v.name.includes('female')) || 
                               voices.find(v => v.name.includes('Google हिन्दी')) ||
-                              voices.find(v => v.lang === 'hi-IN') || 
-                              voices.find(v => v.name.includes('Female')) || voices[0];
+                              voices.find(v => v.lang === 'hi-IN') || voices[0];
         }
         window.speechSynthesis.onvoiceschanged = loadBestVoice;
 
@@ -117,20 +114,29 @@
             orb.classList.add(state);
         }
 
-        // Navigation Controls
-        function goBack() {
-            window.history.back(); // Phone ki pichli screen par le jayega
-        }
+        function goBack() { window.history.back(); }
         function exitApp() {
             if (document.fullscreenElement) document.exitFullscreen();
             else window.history.back();
         }
 
-        // Screen Tap Initialize
+        // --- THE MAGIC CLICK: Screen Touch Setup ---
         document.body.addEventListener('click', function() {
+            // Fullscreen karna
             if (!document.fullscreenElement) document.documentElement.requestFullscreen().catch(e=>e);
+            
+            // Screen on rakhna
             keepScreenOn();
             if(!bestFemaleVoice) loadBestVoice();
+            
+            // Audio Lock kholna (Khali aawaz chala kar)
+            if(!ttsUnlocked) {
+                let unlockAudio = new SpeechSynthesisUtterance("");
+                window.speechSynthesis.speak(unlockAudio);
+                ttsUnlocked = true;
+            }
+
+            // Mic chalu karna
             if (!recognition) initVoiceSystem();
         });
 
@@ -140,23 +146,31 @@
             
             recognition = new SpeechRecognition();
             recognition.continuous = false; 
-            recognition.lang = 'hi-IN';
+            recognition.lang = 'hi-IN'; // Hindi + English
 
             recognition.onstart = () => {
-                if(!isAwake) { statusText.innerText = "Sleeping... Say 'Sara'"; setOrbState('sleeping'); } 
-                else if(!isSpeaking) { statusText.innerText = "Listening..."; setOrbState('listening'); }
+                if(!isAwake) { 
+                    statusText.innerText = "Sleeping... Say 'Sara' ya 'Hello'"; 
+                    setOrbState('sleeping'); 
+                } 
+                else if(!isSpeaking) { 
+                    statusText.innerText = "Listening..."; 
+                    setOrbState('listening'); 
+                }
             };
 
             recognition.onresult = async function(event) {
                 const transcript = event.results[0][0].transcript.toLowerCase().trim();
+                console.log("Mic Heard:", transcript); // Check ke liye console log
                 
                 if (!isAwake) {
-                    if (transcript.includes("sara") || transcript.includes("wake up")) {
+                    // Check Hindi 'सारा', English 'sara' and 'hello'
+                    if (transcript.includes("sara") || transcript.includes("सारा") || transcript.includes("wake up") || transcript.includes("hello")) {
                         isAwake = true;
-                        speak("Hmm... Haan ji bataiye?"); // Human-like wake up response
+                        speak("Hmm... Haan ji bataiye?"); 
                     }
                 } else {
-                    if (transcript.includes("bye") || transcript.includes("stop") || transcript.includes("so jao")) {
+                    if (transcript.includes("bye") || transcript.includes("stop") || transcript.includes("so jao") || transcript.includes("बाय")) {
                         isAwake = false;
                         window.speechSynthesis.cancel();
                         speak("Theek hai. Main jaa rahi hu.");
@@ -166,20 +180,18 @@
                     statusText.innerText = "Thinking...";
                     setOrbState('thinking');
                     
-                    // TRICK: Say 'Hmm' immediately before calling API to sound like a real girl thinking
-                    const fillers = ["Hmm...", "Ek second...", "Umm...", "Sochne dijiye..."];
-                    const randomFiller = fillers[Math.floor(Math.random() * fillers.length)];
-                    speak(randomFiller, true); // True means it's a filler, don't restart mic yet
-
+                    // Artificial human thinking sound
+                    speak("Hmm...", true); 
                     await callGeminiAI(transcript);
                 }
             };
 
             recognition.onerror = (e) => { 
-                if(e.error === 'not-allowed') statusText.innerText = "Mic Permission Denied!";
+                if(e.error === 'not-allowed') statusText.innerText = "Mic Permission Denied! Allow it from site settings.";
             };
             
             recognition.onend = () => { 
+                // Sirf tab dubara chalu karo jab AI bol na rahi ho
                 if(!isSpeaking) { try { recognition.start(); } catch(e) {} }
             };
 
@@ -188,8 +200,8 @@
 
         async function callGeminiAI(prompt) {
             try {
-                // TRICK: Custom prompt for Gemini to act like a real, slightly casual human girl
-                const humanPrompt = prompt + " (Instruction: Reply like a real, casual human girl. Use filler words like 'Hmm', 'Acha', 'Dekho' naturally. Add pauses using commas. Keep it strictly under 2 short sentences in Hinglish. Be friendly and conversational. No emojis.)";
+                // Secret Prompt to make AI sound like a real girl
+                const humanPrompt = prompt + " (Instruction: Reply like a casual human girl. Use filler words like 'Acha', 'Dekho'. Add pauses using commas. Keep it strictly under 2 short sentences in Hinglish. No emojis.)";
 
                 const res = await fetch(`https://generativelanguage.googleapis.com/v1beta/models/gemini-1.5-flash:generateContent?key=${GEMINI_API_KEY}`, {
                     method: 'POST',
@@ -209,14 +221,12 @@
 
         function speak(text, isFiller = false) {
             isSpeaking = true;
-            if(recognition) recognition.stop();
+            if(recognition) recognition.stop(); // Stop listening while AI is talking
 
             const utterance = new SpeechSynthesisUtterance(text);
             utterance.lang = 'hi-IN';
-            
-            // Adjust pitch and rate for a more natural female tone
-            utterance.pitch = 1.2; // Slightly higher pitch for female voice
-            utterance.rate = 0.95; // Slightly slower for natural breathing effect
+            utterance.pitch = 1.2; // Slightly high pitch for soft voice
+            utterance.rate = 0.95; // Slightly slower for natural pacing
             if(bestFemaleVoice) utterance.voice = bestFemaleVoice;
 
             utterance.onstart = () => {
@@ -227,7 +237,7 @@
             };
 
             utterance.onend = () => {
-                if(isFiller) return; // If it was just "Hmm", wait for main AI response
+                if(isFiller) return; // If it was just "Hmm", do not restart mic yet
 
                 isSpeaking = false;
                 if(isAwake) {
@@ -246,5 +256,5 @@
         }
     </script>
 </body>
-  </html>
-  
+        </html>
+    
