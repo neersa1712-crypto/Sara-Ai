@@ -1,0 +1,85 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>AnonChat - Chat</title>
+    <link rel="stylesheet" href="style.css">
+    
+    <!-- Firebase SDK -->
+    <script src="https://www.gstatic.com/firebasejs/9.22.0/firebase-app-compat.js"></script>
+    <script src="https://www.gstatic.com/firebasejs/9.22.0/firebase-firestore-compat.js"></script>
+</head>
+
+<body class="chat-body">
+
+    <!-- CONNECTION STATUS -->
+    <div class="connection-status connecting" id="connectionStatus">
+        🔄 Connect ho raha hai...
+    </div>
+
+    <!-- HEADER -->
+    <div class="chat-header">
+        <div class="header-left">
+            <div class="user-avatar">👤</div>
+            <div class="user-info">
+                <h3 id="otherUserName">Dost ka intezaar...</h3>
+                <div class="user-status">
+                    <div class="status-dot" id="statusDot"></div>
+                    <span id="onlineText">Connecting...</span>
+                    &nbsp;|&nbsp;
+                    <span>Tu: <strong id="myName"></strong></span>
+                </div>
+            </div>
+        </div>
+
+        <div class="header-right">
+            <div class="room-tag" id="roomDisplay">🔒 ------</div>
+            <button class="leave-button" onclick="leaveChat()">
+                ✕ Leave
+            </button>
+        </div>
+    </div>
+
+    <!-- ENCRYPTION BANNER -->
+    <div class="enc-banner">
+        🔒 Ye chat fully anonymous hai • Koi data save nahi hoga • 
+        Bahar jane pe sab delete ho jayega
+    </div>
+
+    <!-- MESSAGES AREA -->
+    <div class="chat-messages" id="chatMessages">
+        <!-- Messages yahan aayenge -->
+        <div class="system-message">
+            <span>🔒 Secure Anonymous Chat Shuru Hua</span>
+        </div>
+        <div class="date-separator">
+            <span>Aaj</span>
+        </div>
+    </div>
+
+    <!-- TYPING INDICATOR -->
+    <div class="typing-area" id="typingArea"></div>
+
+    <!-- INPUT BAR -->
+    <div class="input-bar">
+        <button class="emoji-button" id="emojiBtn" title="Emoji">😊</button>
+        
+        <textarea
+            class="message-input"
+            id="messageInput"
+            placeholder="Message likho..."
+            rows="1"
+            maxlength="500"
+        ></textarea>
+        
+        <button class="send-button" onclick="sendMessage()" title="Send">
+            ➤
+        </button>
+    </div>
+
+    <!-- Chat Script -->
+    <script src="chat.js"></script>
+
+</body>
+</html>
